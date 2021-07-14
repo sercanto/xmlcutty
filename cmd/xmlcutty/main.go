@@ -33,6 +33,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/miku/xmlcutty"
@@ -40,7 +41,7 @@ import (
 )
 
 // Version of xmlcutty.
-const Version = "0.1.5"
+const Version = "0.1.6 s0.0.1"
 
 type dummy struct {
 	Text []byte `xml:",innerxml"`
@@ -57,11 +58,20 @@ func lastElement(p string) string {
 
 func main() {
 	path := flag.String("path", "/", "select path")
+	regexpath := flag.String("regexpath", "", "regular expression path matching")
 	root := flag.String("root", "", "synthetic root element")
 	rename := flag.String("rename", "", "rename wrapper element to this name")
 	version := flag.Bool("v", false, "show version")
+	count := flag.Bool("count", false, "calculate count of matching elements")
+	verbose := flag.Bool("verbose", false, "enable verbose messages")
 
 	flag.Parse()
+
+	var repath *regexp.Regexp
+	if regexpath != nil {
+		repath = regexp.MustCompile(*regexpath)
+		path = regexpath
+	}
 
 	if *version {
 		fmt.Println(Version)
@@ -123,6 +133,7 @@ func main() {
 		fmt.Println("<" + *root + ">")
 	}
 
+	counter := 0
 	for {
 		t, err := decoder.Token()
 		if err == io.EOF {
@@ -134,15 +145,35 @@ func main() {
 		switch e := t.(type) {
 		case xml.StartElement:
 			stack.Push(e.Name.Local)
-			if *path == stack.String() {
+
+			// Matching
+			matched := false
+			if repath != nil {
+				matched = repath.MatchString(stack.String())
+			} else {
+				matched = *path == stack.String()
+			}
+
+			if matched {
+				if *verbose {
+					if repath != nil {
+						fmt.Printf("Matched %s against regular expression %s\n", stack.String(), *regexpath)
+					} else {
+						fmt.Printf("Matched %s against string %s\n", stack.String(), *path)
+					}
+				}
 				var d dummy
 				if err := decoder.DecodeElement(&d, &e); err != nil {
 					log.Fatal(err)
 				}
 				stack.Pop()
-				fmt.Print(opener)
-				fmt.Print(string(d.Text))
-				fmt.Print(closer)
+				if count != nil && *count {
+					counter++
+				} else {
+					fmt.Print(opener)
+					fmt.Print(string(d.Text))
+					fmt.Print(closer)
+				}
 			}
 		case xml.EndElement:
 			stack.Pop()
@@ -151,5 +182,12 @@ func main() {
 
 	if *root != "" {
 		fmt.Println("</" + *root + ">")
+	}
+
+	if count != nil && *count {
+		if *verbose {
+			fmt.Print("Count: ")
+		}
+		fmt.Printf("%d", counter)
 	}
 }

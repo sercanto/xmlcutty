@@ -9,6 +9,25 @@ can process around 1G of XML per minute.
 
 Why? [Background](http://stackoverflow.com/q/33653844/89391).
 
+Development
+-----------
+
+Packages updates:
+```sh
+go get -u
+go mod tidy
+```
+
+Compile
+-------
+
+```sh
+# Linux amd64 architecture
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o xmlcutty cmd/xmlcutty/main.go
+strip xmlcutty
+```
+
+
 Install
 -------
 
